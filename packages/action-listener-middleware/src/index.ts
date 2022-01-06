@@ -31,7 +31,7 @@ import type {
   ForkedTaskExecutor,
   ForkedTask,
 } from './types'
-import { assertFunction, catchRejection } from './utils'
+import { assertFunction, catchRejection, createProducer } from './utils'
 import { TaskAbortError } from './exceptions'
 import {
   runTask,
@@ -432,8 +432,8 @@ export function createActionListenerMiddleware<
     }
 
     // Need to get this state _before_ the reducer processes the action
-    const originalState = api.getState()
-    const getOriginalState = () => originalState
+    // We do not want to store a reference to the previous state in this lexical scope.
+    let getOriginalState: null | (() => S) = createProducer(api.getState())
 
     // Actually forward the action to the reducer before we handle listeners
     const result: unknown = next(action)
@@ -444,7 +444,11 @@ export function createActionListenerMiddleware<
         let runListener = false
 
         try {
-          runListener = entry.predicate(action, currentState, originalState)
+          runListener = entry.predicate(
+            action,
+            currentState,
+            getOriginalState()
+          )
         } catch (predicateError) {
           runListener = false
 
@@ -460,6 +464,10 @@ export function createActionListenerMiddleware<
         notifyListener(entry, action, api, getOriginalState)
       }
     }
+
+    // Remove closure on the previous state from this scope:
+    // it's up to the user to decide if they want to keep the previous state around.
+    getOriginalState = null
 
     return result
   }

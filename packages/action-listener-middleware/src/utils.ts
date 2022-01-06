@@ -20,3 +20,7 @@ export const catchRejection = <T>(
 
   return promise
 }
+
+export const createProducer = <T>(value: T) => {
+  return () => value
+}
